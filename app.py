@@ -100,8 +100,8 @@ with tab1:
 
     # --- REVISE ---
     # TYPE OF CONECTORS filter
-    #all_connectors = sorted({c for conns in station_points['connections'] for c in conns})  # set para evitar duplicados
-    # selected_connectors = st.sidebar.multiselect("**Selecciona tipo(s) de conector:**", all_connectors, placeholder="")
+    all_connectors = sorted({c for c in connectors['connector_type'].values})  # set para evitar duplicados
+    selected_connectors = st.sidebar.multiselect("**Selecciona tipo(s) de conector:**", all_connectors, placeholder="")
     
     # Apply filters
     if selected_district:
@@ -112,10 +112,11 @@ with tab1:
         filtered_points = filtered_points[filtered_points['management'].isin(selected_management)]
 
     # --- TO REVISE --- NO CONNECTIONS IN FILTERED_POINTS DATAFRAME
-    #if selected_connectors:
-        #filtered_points = filtered_points[
-        #filtered_points['connections'].apply(lambda conns: any(conn in conns for conn in selected_connectors))
-        #]
+    if selected_connectors:
+        stations_with_selected_connectors = connectors[connectors['connector_type'].isin(selected_connectors)]
+        filtered_points = filtered_points[
+        filtered_points['station_id'].isin(stations_with_selected_connectors['station_id'].values)
+        ]
     # Count filtered charging points
     counter.metric(label="**Puntos de recarga coincidentes:**", value=len(filtered_points))
     
@@ -147,7 +148,7 @@ with tab1:
 
 with tab2:
     # Some statistics about the distribution and interesting 
-    # caracteristics of the represented charging points
+    # insights about the represented charging points
     st.header("Estadísticas Relevantes")
     # Group and count by neighborhood
     df_neighborhoods = (
