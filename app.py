@@ -10,20 +10,50 @@ Run locally with:
 """
 
 import streamlit as st
+import pandas as pd
 import folium
 from folium import plugins
 from streamlit_folium import st_folium
 import plotly.express as px
-from keys import API_KEY
-from data_utils import read_dataAPI, popup_html, download_stations_toCSV
+from etl_pipeline.config import get_api_key
+from etl_pipeline.data_utils import popup_html, download_stations_toCSV
+from etl_pipeline.extract import read_dataCSV, read_dataAPI
+from etl_pipeline.transform import normalize_stations_data, build_station_and_connector_tables
+from etl_pipeline.load import load_processed_data, save_processed_data
 
 
-station_points = read_dataAPI()
+DATA_FILE = './etl_pipeline/data/raw/PUNTOS_PUBLICOS_RECARGA_VEHICULOS_ELECTRICOS.csv'
+
+
+@st.cache_data
+def get_pipeline_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Return the processed stations/connectors tables, refreshing the cache if stale.
+ 
+    First tries the on-disk Parquet cache (``etl.load.load_processed_data``).
+    If it's missing or older than the configured TTL, runs the full
+    extract -> transform pipeline and persists the fresh result.
+ 
+    Returns:
+        tuple[pd.DataFrame, pd.DataFrame]: ``(stations_df, connectors_df)``.
+    """
+    cached_stations, cached_connectors = load_processed_data()
+    if cached_stations is not None and cached_connectors is not None:
+        return cached_stations, cached_connectors
+ 
+    raw_df = read_dataCSV(DATA_FILE)
+    stations_df = normalize_stations_data(raw_df)
+    api_points = read_dataAPI(get_api_key())
+    stations_df, connectors_df = build_station_and_connector_tables(stations_df, api_points)
+    save_processed_data(stations_df, connectors_df)
+    return stations_df, connectors_df
+
+# --- TO DO ---
+station_points, connectors = get_pipeline_data()
 filtered_points = station_points.copy()
 
 
 # Title of the webpage
-st.header("Puntos de recarga públicos para vehículos eléctricos en Madrid (España)")
+st.header("Puntos de recarga públicos para vehículos eléctricos en Madrid")
 
 # Create tabs for specific functionalities
 tab1, tab2 = st.tabs(['Mapa de Estaciones', 'Estadísticas'])
@@ -67,9 +97,12 @@ with tab1:
     # OPERATOR filter
     operators = sorted(station_points['operator'].unique())
     selected_operator = st.sidebar.multiselect("**Selecciona operador(es):**", operators, placeholder="")
+
+    # --- REVISE ---
     # TYPE OF CONECTORS filter
-    all_connectors = sorted({c for conns in station_points['connections'] for c in conns})  # set para evitar duplicados
-    selected_connectors = st.sidebar.multiselect("**Selecciona tipo(s) de conector:**", all_connectors, placeholder="")
+    #all_connectors = sorted({c for conns in station_points['connections'] for c in conns})  # set para evitar duplicados
+    # selected_connectors = st.sidebar.multiselect("**Selecciona tipo(s) de conector:**", all_connectors, placeholder="")
+    
     # Apply filters
     if selected_district:
         filtered_points = filtered_points[filtered_points['neighborhood'].isin(selected_district)]
@@ -77,10 +110,12 @@ with tab1:
         filtered_points = filtered_points[filtered_points['operator'].isin(selected_operator)]
     if selected_management:
         filtered_points = filtered_points[filtered_points['management'].isin(selected_management)]
-    if selected_connectors:
-        filtered_points = filtered_points[
-        filtered_points['connections'].apply(lambda conns: any(conn in conns for conn in selected_connectors))
-        ]
+
+    # --- TO REVISE --- NO CONNECTIONS IN FILTERED_POINTS DATAFRAME
+    #if selected_connectors:
+        #filtered_points = filtered_points[
+        #filtered_points['connections'].apply(lambda conns: any(conn in conns for conn in selected_connectors))
+        #]
     # Count filtered charging points
     counter.metric(label="**Puntos de recarga coincidentes:**", value=len(filtered_points))
     
@@ -98,7 +133,7 @@ with tab1:
         mark = point['lat'], point['lon']
         folium.Marker(
             mark,
-            popup=popup_html(point),
+            popup=popup_html(point, connectors),
             tooltip=point["location"],
             icon=folium.Icon(color='green', icon='bolt', icon_color='white', prefix='fa')  # ícono tipo "rayo" de FontAwesome (fa)
         ).add_to(marker_cluster)
