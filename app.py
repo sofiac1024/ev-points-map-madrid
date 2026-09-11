@@ -24,7 +24,6 @@ from etl_pipeline.load import load_processed_data, save_processed_data
 
 DATA_FILE = './etl_pipeline/data/raw/PUNTOS_PUBLICOS_RECARGA_VEHICULOS_ELECTRICOS.csv'
 
-
 @st.cache_data
 def get_pipeline_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return the processed stations/connectors tables, refreshing the cache if stale.
@@ -97,8 +96,6 @@ with tab1:
     # OPERATOR filter
     operators = sorted(station_points['operator'].unique())
     selected_operator = st.sidebar.multiselect("**Selecciona operador(es):**", operators, placeholder="")
-
-    # --- REVISE ---
     # TYPE OF CONECTORS filter
     all_connectors = sorted({c for c in connectors['connector_type'].values})  # set para evitar duplicados
     selected_connectors = st.sidebar.multiselect("**Selecciona tipo(s) de conector:**", all_connectors, placeholder="")
@@ -110,8 +107,6 @@ with tab1:
         filtered_points = filtered_points[filtered_points['operator'].isin(selected_operator)]
     if selected_management:
         filtered_points = filtered_points[filtered_points['management'].isin(selected_management)]
-
-    # --- TO REVISE --- NO CONNECTIONS IN FILTERED_POINTS DATAFRAME
     if selected_connectors:
         stations_with_selected_connectors = connectors[connectors['connector_type'].isin(selected_connectors)]
         filtered_points = filtered_points[
@@ -128,7 +123,6 @@ with tab1:
         file_name="estaciones_filtradas.csv",
         mime="text/csv"
     )
-
 
     for _, point in filtered_points.iterrows():
         mark = point['lat'], point['lon']
@@ -173,8 +167,8 @@ with tab2:
     )
     # Sort the bars by count
     chart1.update_layout(xaxis={'categoryorder': 'total descending'})
-    # PLot the graph
-    st.plotly_chart(chart1, use_container_width=True)
+    # Plot the graph
+    st.plotly_chart(chart1, width='stretch')
 
     # Now we do the same but by most common operators of these charging points
     df_operators = filtered_points.groupby("operator").size().reset_index(name="count")
@@ -189,4 +183,4 @@ with tab2:
             "count": "Número de puntos de recarga"  # rename Y axis
         } 
     )   
-    st.plotly_chart(chart2, use_container_width=True)
+    st.plotly_chart(chart2, width='stretch')
