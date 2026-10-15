@@ -39,16 +39,19 @@ This project merges these two sources (matching each point from the local datase
 
 ## Architecture
 
+![System's architecture's design (Diagram)](assets/architecture-design.png)
+
+
 ### [Diagram of the entire structure and architecture of the project, including file names]
 
 
 ## Technical decisions taken
 
-1. Passing coordinates from Madrid's datatset from UTM format to WGS84.
+### 1. Passing coordinates from Madrid's datatset from UTM format to WGS84.
 
 Folium's mapping function (folium.Map), which was chosen because Streamlit's native maps (streamlit.map) don't support custom popups; manages exclusively WGS84 coordinates, which are standard latitude and longitude decimal degrees [latitude, longitude]. 
 
-2. Retry with Tenacity library for failed HTTP requests to OpenChargeMap API.
+### 2. Retry with Tenacity library for failed HTTP requests to OpenChargeMap API.
 
 If OpenChargeMap fails o hits rate-limit, the app would probably break. Thus, its necessary to add a retry strategy and explicit timeouts in requests.get to make sure there is a contigency plan in case the API fails.
 
@@ -57,13 +60,13 @@ Tenacity is the most popular general-purpose retry library in the Python ecosyst
 - https://scrapeops.io/python-web-scraping-playbook/python-requests-retry-failed-requests/#retry-failed-requests-using-tenacity
 - https://tenacity.readthedocs.io/en/latest/ 
 
-3. Matching of EV-points by geographic distance.
+### 3. Matching of EV-points by geographic distance.
 
 Given the absence of an individual ID atribute for these EV stations in Madrid's dataset and considering that, in case such an atribute existed, these two data sources would not share a common ID assigning method; these points can only be matched in terms of physical closeness. 
 
 Having into account the dataset and the API won't have the exact same coordinates for each charging point, we can only achieve closest matches relative to geographical distance.
 
-4. Use a BallTree to find an OCM match for the CSV file's EV points.
+### 4. Use a BallTree to find an OCM match for the CSV file's EV points.
 
 The classic way of matching the EV points from both data sources would be, once the API request has been answered successfully, to iterate through every station from the local dataset and then, for each EV station, iterate through all points from the API to get its closest match.
 
@@ -77,7 +80,7 @@ BallTree's design facilitates fast nearest neighbor searches, as it allows for t
 - https://medium.com/@geethasreemattaparthi/ball-tree-and-kd-tree-algorithms-a03cdc9f0af9 
 - https://scikit-learn.org/stable/modules/generated/sklearn.metrics.pairwise.haversine_distances.html 
 
-5. Using Parquet as a valid format for cache processed data.
+### 5. Using Parquet as a valid format for cache processed data.
 
 Even though Pandas library offers many options to write and save our data (i.e. to_csv, to_parquet, to_excel, etc.), like the cache processed data of this project; 'Parquet' format was chosen because of its columnar style format that makes it faster to read and analyze data; while its advanced compression algorithms save greatly on data storage compared to more traditional formats like CSV or Excel.
 

@@ -46,28 +46,22 @@ def get_pipeline_data() -> tuple[pd.DataFrame, pd.DataFrame]:
     save_processed_data(stations_df, connectors_df)
     return stations_df, connectors_df
 
-# --- TO DO ---
+
 station_points, connectors = get_pipeline_data()
 filtered_points = station_points.copy()
 
 
+# Allows us to use the whole width of the screen, and no t center it all into a narrow column
+# Must be the FIRST Streamlit command in the script
+st.set_page_config(layout="wide")
 # Title of the webpage
-st.header("Puntos de recarga públicos para vehículos eléctricos en Madrid")
+with st.container():
+    st.title("Puntos de recarga públicos para vehículos eléctricos en Madrid")
 
 # Create tabs for specific functionalities
 tab1, tab2 = st.tabs(['Mapa de Estaciones', 'Estadísticas'])
 
 with tab1:
-    # Create a dynamic map with Streamlit_Folium centered in MADRID
-    MADRID_CENTRE = (40.41677473410711, -3.7037457319298768) # Format EPSG:4326 (lat/lon WGS84)
-    # Crear mapa centrado en Madrid Centro
-    map = folium.Map(location=MADRID_CENTRE, zoom_start=11.5)
-    # Add pointers' clustering
-    marker_cluster = plugins.MarkerCluster().add_to(map)
-
-    # EXTRA PLUGINS
-    # Add a location searcher: GeoCoder
-    plugins.Geocoder(collapsed=True).add_to(map)
     # Add filters in a sidebar
     st.html('''
         <style>
@@ -120,9 +114,21 @@ with tab1:
     st.download_button(
         label="Exportar estaciones filtradas a CSV",
         data=csv_export,
-        file_name="estaciones_filtradas.csv",
+        file_name="filtered_stations.csv",
         mime="text/csv"
     )
+
+
+    # Create a dynamic map with Streamlit_Folium centered in MADRID
+    MADRID_CENTRE = (40.41677473410711, -3.7037457319298768) # Format EPSG:4326 (lat/lon WGS84)
+    # Crear mapa centrado en Madrid Centro
+    map = folium.Map(location=MADRID_CENTRE, zoom_start=11.5)
+    # Add pointers' clustering
+    marker_cluster = plugins.MarkerCluster().add_to(map)
+
+    # EXTRA PLUGINS
+    # Add a location searcher: GeoCoder
+    plugins.Geocoder(collapsed=True).add_to(map)
 
     for _, point in filtered_points.iterrows():
         mark = point['lat'], point['lon']
@@ -130,57 +136,57 @@ with tab1:
             mark,
             popup=popup_html(point, connectors),
             tooltip=point["location"],
-            icon=folium.Icon(color='green', icon='bolt', icon_color='white', prefix='fa')  # ícono tipo "rayo" de FontAwesome (fa)
+            icon=folium.Icon(color='green', icon='bolt', icon_color='white', prefix='fa')  # icon type "lighting" from FontAwesome (fa)
         ).add_to(marker_cluster)
 
 
     # Call to render the interactive map with Folium on the Streamlit site 
-    st.header("Mapa Interactivo")
-    st_data = st_folium(map, width=700, height=450)
+    st_folium(map, height=550, width="strech")
 
 
-
+# Some statistics about the distribution and interesting 
+# insights about the represented charging points
 with tab2:
-    # Some statistics about the distribution and interesting 
-    # insights about the represented charging points
-    st.header("Estadísticas Relevantes")
-    # Group and count by neighborhood
-    df_neighborhoods = (
-        filtered_points.groupby("neighborhood")
-        .size()
-        .reset_index(name="count")
-    )
-    # Sort from highest to lowest and get the first 10 neighborhoods
-    df_top10 = df_neighborhoods.sort_values("count", ascending=False).head(10)
-    # Bar chart
-    chart1 = px.bar(
-        df_top10,
-        x="neighborhood",
-        y="count",
-        title="Top 10 barrios con más puntos de recarga",
-        color="count",
-        text="count",
-        labels={
-            "neighborhood": "Barrio",   # rename X axis
-            "count": "Número de puntos de recarga"  # rename Y axis
-        }
-    )
-    # Sort the bars by count
-    chart1.update_layout(xaxis={'categoryorder': 'total descending'})
-    # Plot the graph
-    st.plotly_chart(chart1, width='stretch')
+    col1, col2 = st.columns(2, gap="small", vertical_alignment="top")
+    with col1:
+        # Group and count by neighborhood
+        df_neighborhoods = (
+            filtered_points.groupby("neighborhood")
+            .size()
+            .reset_index(name="count")
+        )
+        # Sort from highest to lowest and get the first 10 neighborhoods
+        df_top10 = df_neighborhoods.sort_values("count", ascending=False).head(10)
+        # Bar chart
+        chart1 = px.bar(
+            df_top10,
+            x="neighborhood",
+            y="count",
+            title="Top 10 barrios con más puntos de recarga",
+            color="count",
+            text="count",
+            labels={
+                "neighborhood": "Barrio",   # rename X axis
+                "count": "Número de puntos de recarga"  # rename Y axis
+            }
+        )
+        # Sort the bars by count
+        chart1.update_layout(xaxis={'categoryorder': 'total descending'})
+        # Plot the graph
+        st.plotly_chart(chart1, width='stretch')
 
-    # Now we do the same but by most common operators of these charging points
-    df_operators = filtered_points.groupby("operator").size().reset_index(name="count")
-    chart2 = px.pie(
-        df_operators,
-        names="operator",      
-        values="count",        
-        title="Número de puntos de recarga por operador",
-        hover_data=["count"], 
-        labels={
-            "operator": "Operador",   # rename X axis
-            "count": "Número de puntos de recarga"  # rename Y axis
-        } 
-    )   
-    st.plotly_chart(chart2, width='stretch')
+    with col2:
+        # Now we do the same but by most common operators of these charging points
+        df_operators = filtered_points.groupby("operator").size().reset_index(name="count")
+        chart2 = px.pie(
+            df_operators,
+            names="operator",      
+            values="count",        
+            title="Número de puntos de recarga por operador",
+            hover_data=["count"], 
+            labels={
+                "operator": "Operador",   # rename X axis
+                "count": "Número de puntos de recarga"  # rename Y axis
+            } 
+        )   
+        st.plotly_chart(chart2, width='stretch')
